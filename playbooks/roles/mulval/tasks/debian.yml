@@ -1,0 +1,91 @@
+# http://www.arguslab.org/software/mulval.html
+# Vars
+- name: "Set parameters"
+  set_fact:
+          mulval_path: "/opt/mulval/mulval/bin:/opt/mulval/mulval/utils:/opt/xsb/XSB/bin"
+
+
+- name: "Set MULVALROOT"
+  lineinfile:
+    dest: /etc/environment
+    state: present
+    regexp: '^MULVALROOT'
+    line: 'MULVALROOT=/opt/mulval/mulval'
+    insertbefore: true
+  become: yes
+
+- name: "add {{mulval_path}} to path"
+  lineinfile:
+    dest=/etc/environment
+    state=present
+    backrefs=yes
+    regexp='PATH=(["]*)((?!.*?{{mulval_path}}).*?)(["]*)$'
+    line="PATH=\1\2:{{mulval_path}}\3"
+  become: yes
+
+- name: "Install dependencies"
+  apt:
+    pkg:
+      - git
+      - python-pip
+      - autoconf
+      - build-essential
+      - graphviz
+      - mysql-server
+      - default-jdk
+      - flex
+      - bison
+      - texlive-font-utils
+
+    state: present
+    #when: ansible_python_version == "2.7.6"
+  become: yes
+
+  # https://github.com/flavioc/XSB/blob/master/INSTALL
+- name: "xsb install path exists"
+  file:
+    path: /opt/xsb
+    state: directory
+    owner: "{{ansible_user_id}}"
+  tags: xsb
+  become: yes
+
+- name: "unpack xsb"
+  unarchive:
+    src: http://xsb.sourceforge.net/downloads/XSB.tar.gz
+    dest: /opt/xsb
+    remote_src: yes
+    creates: /opt/xsb/XSB/InstallXSB.jar
+    owner: "{{ansible_user_id}}"
+  tags: xsb
+
+- name: "build xsb"
+  shell: ./configure && ./makexsb
+  args:
+      chdir: /opt/xsb/XSB/build
+
+
+ # http://people.cs.ksu.edu/~xou/argus/software/mulval/readme.html
+- name: "mulval path exists"
+  file:
+    path: /opt/mulval
+    state: directory
+    owner: "{{ansible_user_id}}"
+  tags: mulval
+  become: yes
+
+- name: "unpack mulval"
+  unarchive:
+    src: http://www.arguslab.org/software/mulval_1_1.tar.gz
+    dest: /opt/mulval
+    remote_src: yes
+    creates: /opt/mulval/mulval/Makefile
+    owner: "{{ansible_user_id}}"
+  tags: mulval
+
+- name: "build mulval"
+  make:
+    chdir: /opt/mulval/mulval
+    target: all
+  environment:
+    MULVALROOT: /opt/mulval/mulval

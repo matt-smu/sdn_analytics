@@ -1,0 +1,22 @@
+---
+- name: ATT
+  hosts: all
+  become: no
+  #strategy: debug
+  #gather_facts: False
+  gather_facts: False
+
+  pre_tasks:
+    - name: Install python 2
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+      changed_when: False
+      become: yes
+    - setup:
+          
+  tasks:
+    - name: "Setup MulVal:"       
+      import_role:
+        name: 'mulval'
+      become: no
+
+

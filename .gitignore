@@ -1,0 +1,6 @@
+
+# ignore ansible retry artifacts
+*.retry
+
+.git/
+.vagrant/
