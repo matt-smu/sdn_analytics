@@ -1,0 +1,60 @@
+# runs some mulvals
+# copies output back 
+
+
+#- name: mkdir -p dirs before copying
+#  file: 
+#    path: "/tmp/models/{{ item|basename }}/"
+#    state: directory
+#    mode: 0755
+#  with_fileglob:
+#     - "models/*"
+
+
+#- name: copy models to run
+#  copy: 
+#    src: "{{ item }}" 
+#    dest: "/tmp/models//{{ item|basename }}/"
+#  with_fileglob:
+#     - "models/*"
+
+
+- name: remove old models dir
+  file:
+          path: /tmp/models
+          state: absent
+
+- name: copy models to remote
+  copy:
+          src: models
+          dest: /tmp/
+
+- name: get list of file paths
+  find: 
+    paths: /tmp/models
+    patterns: '*.p,*.P'
+    recurse: yes
+    file_type: file
+  register: find_results
+
+- name: what we found
+  debug: 
+    msg: "{{ find_results }}"
+
+- name: chdir paths
+  debug:
+    msg: " {{ item.path|dirname }} "
+  with_items: " {{ find_results.files }} "
+
+- name:  run mulval 
+  shell: bash -lc "graph_gen.sh {{ item.path|basename }} -p -v"
+  args:
+          chdir: "{{item.path|dirname}}"
+          #chdir: /tmp/models/ag_01
+  with_items: " {{ find_results.files }} "
+
+- name: copy output and rename
+  fetch:
+    src: /tmp/AttackGraph.pdf
+    dest: /tmp/prefix-{{ inventory_hostname }}.pdf
+    flat: yes 
