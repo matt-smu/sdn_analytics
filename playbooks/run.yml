@@ -50,11 +50,10 @@
   shell: bash -lc "graph_gen.sh {{ item.path|basename }} -p -v"
   args:
           chdir: "{{item.path|dirname}}"
-          #chdir: /tmp/models/ag_01
   with_items: " {{ find_results.files }} "
 
-- name: copy output and rename
-  fetch:
-    src: /tmp/AttackGraph.pdf
-    dest: /tmp/prefix-{{ inventory_hostname }}.pdf
-    flat: yes 
+  #- name: copy output and rename
+  #fetch:
+  #  src: /tmp/AttackGraph.pdf
+  #  dest: /tmp/prefix-{{ inventory_hostname }}.pdf
+  #  flat: yes 

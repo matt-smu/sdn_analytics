@@ -23,7 +23,21 @@
     line="PATH=\1\2:{{mulval_path}}\3"
   become: yes
 
+- name: register java 7 ppa
+  become: yes
+  apt_repository: repo=ppa:openjdk-r/ppa
+  environment: 
+    APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE: True
+
+- name: install openjdk-8
+  become: yes
+  apt: 
+    pkg:
+      - openjdk-8-jdk
+  update_cache: yes
+
 - name: "Install dependencies"
+  become: yes
   apt:
     pkg:
       - git
@@ -32,17 +46,17 @@
       - build-essential
       - graphviz
       - mysql-server
-      - default-jdk
+        #- default-jdk
+        #- openjdk-7-jdk
       - flex
       - bison
       - texlive-font-utils
 
     state: present
     #when: ansible_python_version == "2.7.6"
-  become: yes
 
   # https://github.com/flavioc/XSB/blob/master/INSTALL
-- name: "xsb install path exists"
+- name: "ensure xsb install path exists"
   file:
     path: /opt/xsb
     state: directory
@@ -63,16 +77,17 @@
   shell: ./configure && ./makexsb
   args:
       chdir: /opt/xsb/XSB/build
+      creates: /opt/xsb/XSB/bin/xsb
 
 
  # http://people.cs.ksu.edu/~xou/argus/software/mulval/readme.html
-- name: "mulval path exists"
+- name: "ensure mulval path exists"
+  become: yes
   file:
     path: /opt/mulval
     state: directory
     owner: "{{ansible_user_id}}"
   tags: mulval
-  become: yes
 
 - name: "unpack mulval"
   unarchive:
@@ -83,9 +98,55 @@
     owner: "{{ansible_user_id}}"
   tags: mulval
 
+  # Fix NVD name change
+  #   String fname="nvd_xml_files/nvdcve-"+Integer.toString(ct)+".xml
+  # Yaml requires escaping backslashes in double quotes but not in single quotes
+  #- name: fix nvd file name change for db sync
+  #replace:
+  #  path: /opt/mulval/mulval/src/adapter/InitializeDB.java
+  #  regexp: 'nvdcve-[^2]'
+  #  replace: 'nvdcve-2.0-"'
+
+- name: add db connect parms to config.txt
+  template:
+    src: templates/config.txt.j2
+    dest: /opt/mulval/mulval/utils/config.txt
+
+- name: fix nvd_sync.sh file name and type changes
+  replace:
+    path: /opt/mulval/mulval/utils/nvd_sync.sh
+    regexp: '^(.*)http://nvd.nist.gov/download/nvdcve-\$i.xml(.*)$'
+    #replace: '\1http://static.nvd.nist.gov/feeds/xml/cve/nvdcve-2.0-$i.xml.zip\2'
+    replace: '\1https://nvd.nist.gov/download/nvdcve-$i.xml.gz\2'
+    backup: True
+
+- name: update nvd_sync.sh to unzip archives
+  lineinfile: 
+    path: /opt/mulval/mulval/utils/nvd_sync.sh
+    insertafter: '^(\s*)\w.*https://nvd.nist.gov/download/nvdcve-\$i.xml.gz$' 
+    line: '      gunzip nvdcve-$i.xml.gz'
+    regexp: '.*gunzip nvdcve-\$i.xml.gz.*'
+
+- name: check if mulval is built  
+  stat: 
+    path: /opt/mulval/mulval/bin/attack_graph 
+  register: mulval_build
+
 - name: "build mulval"
   make:
     chdir: /opt/mulval/mulval
     target: all
   environment:
     MULVALROOT: /opt/mulval/mulval
+  when: mulval_build.stat.exists == False
+
+- name: check if nvd db is available
+  become: True
+  shell: mysql -e 'show databases;' | grep nvd
+  register: dbstatus
+
+- name: show dbstatus
+  debug: 
+    var: dbstatus
+
+  #- name: load nvd data

@@ -1,22 +1,47 @@
 ---
-- name: ATT
+- name: Setup and run AT&T Mulval models
   hosts: all
   become: no
   #strategy: debug
   #gather_facts: False
   gather_facts: False
 
+
+  vars_files:
+    - vars/main.yml
+
   pre_tasks:
-    - name: Install python 2
-      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+    
+    - name: Install python 3
+      raw: test -e /usr/bin/python3 || (apt -y update && apt install -y python3-minimal)  && test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
       changed_when: False
       become: yes
     - setup:
+
+    # from https://github.com/geerlingguy/ansible-role-mysql/issues/307
+    #- name: Install the official MySQL repo
+    #  become: yes
+    #  apt:
+    #    deb: https://dev.mysql.com/get/mysql-apt-config_0.8.11-1_all.deb
+    #    state: present
+    #  when: ansible_os_family == 'Debian'
+    #- name: Override variables for MySQL (Debian)
+    #  set_fact:
+    #    mysql_packages: ['mysql-server']
+    #  when: ansible_os_family == 'Debian'
+
           
   tasks:
+
+    - name: setup mysql
+      become: True
+      include_role:
+         name: ansible-role-mysql
+
     - name: "Setup MulVal:"       
       import_role:
         name: 'mulval'
       become: no
 
-
+      #- name: run mulval
+      #import_tasks: run.yml
